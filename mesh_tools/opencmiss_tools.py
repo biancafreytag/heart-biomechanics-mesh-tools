@@ -6,7 +6,8 @@ def interpolate_opencmiss_field(field, element_ids=[], xi=None, num_values=4,dim
 
     if xi is None:
         if face == None:
-            XiNd = fields.generate_xi_grid_fem(num_points=num_values)
+            XiNd = fields.generate_xi_grid_fem(
+                num_points=[num_values, num_values, num_values])
         else:
             XiNd = fields.generate_xi_on_face(face, value, num_points=num_values, dim=dimension)
 
