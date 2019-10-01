@@ -1,4 +1,5 @@
 import os
+import numpy as np
 from opencmiss.iron import iron
 
 class Fitting:
@@ -63,7 +64,34 @@ class Fitting:
         self.problem_specification = ([iron.ProblemClasses.FITTING,
                                        iron.ProblemTypes.DATA_FITTING,
                                        iron.ProblemSubtypes.STATIC_FITTING])
-        
+
+    def set_data_position(
+            self, xi=None, position=None, dataset_num=1, datapoint_ids=None):
+        """
+        Sets positions of data as mesh xi or data positions
+        """
+
+        if position is not None:
+            # Create data points from given positions
+            if datapoint_ids is None:
+                datapoint_ids = np.arange()
+            position = np.array(position)
+            num_datapoints = position.shape[0]
+            num_components = position.shape[1]
+            if num_datapoints != len(datapoint_ids):
+                raise ValueError('Mismatch in datapoint ids and positions')
+
+            self.datapoints = iron.DataPoints()
+            self.datapoints.CreateStart(
+                dataset_num, self.region, num_datapoints)
+            for idx, datapoint_id in enumerate(datapoint_ids):
+                for component_idx, component in enumerate(
+                        np.arange(num_components)+1):
+                    self.datapoints.PositionSet(
+                        idx, position[idx, component_idx])
+                self.datapoints.CreateFinish()
+
+
     def set_results_folder(self, results_folder):
         """
         Sets results folder for exporting solutions
@@ -140,7 +168,8 @@ class Fitting:
         """
         self.interpolation_type = iron.FieldInterpolationTypes.GAUSS_POINT_BASED
 
-    def setup_fields(self, num_components=6):
+    def setup_fields(
+            self, scaling_type=iron.FieldScalingTypes.NONE, num_components=6):
         """
         Sets up the field for a fitting problem.
         """
@@ -169,6 +198,7 @@ class Fitting:
                 self.data_field.ComponentInterpolationSet(
                     variable_type, component,
                     iron.FieldInterpolationTypes.GAUSS_POINT_BASED)
+        self.data_field.ScalingTypeSet(scaling_type)
         self.data_field.CreateFinish()
 
         # Initialise Gauss point weight field to 1.0
@@ -199,6 +229,7 @@ class Fitting:
             for component in components:
                 self.dependent_field.ComponentMeshComponentSet(
                     variable_type, component, mesh_component)
+        self.dependent_field.ScalingTypeSet(scaling_type)
         self.dependent_field.CreateFinish()
 
         # Set Sobolev smoothing parameters - kappa and tau
@@ -213,6 +244,7 @@ class Fitting:
             iron.FieldVariableTypes.U, self.num_smoothing_components)
         self.material_field.VariableLabelSet(
             iron.FieldVariableTypes.U, 'SmoothingParameters')
+        self.material_field.ScalingTypeSet(scaling_type)
         self.material_field.CreateFinish()
 
         # Set smoothing parameters
@@ -249,6 +281,13 @@ class Fitting:
         self.equations_set.MaterialsCreateStart(self.material_field_user_num,
                                                 self.material_field)
         self.equations_set.MaterialsCreateFinish()
+
+        self.equations_set.DerivedCreateStart(
+            self.data_field_user_num, self.data_field)
+        self.equations_set.DerivedVariableSet(
+            iron.EquationsSetDerivedTensorTypes.CAUCHY_STRESS,
+            iron.FieldVariableTypes.U)
+        self.equations_set.DerivedCreateFinish()
 
         self.equations = iron.Equations()
         self.equations_set.EquationsCreateStart(self.equations)

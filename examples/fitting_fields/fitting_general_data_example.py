@@ -117,6 +117,8 @@ if __name__ == '__main__':
     fitting.set_decomposition(decomposition)
     fitting.set_geometric_field(geometric_field)
     fitting.setup_fields()
+    fitting.set_data_position(xi=[], position=[])
+    #fitting.set_data_values(values, labels)
     fitting.setup_equations()
     fitting.setup_problem()
     fitting.set_smoothing_parameters(smoothing_parameters)
