@@ -23,14 +23,12 @@ def setup_mesh():
     geometric_field = iron.Field()
     
     dimensions = np.array(
-        [30, 10, 10])  # Length, width, height (in mm)
-    num_elements = [2, 2, 2]
+        [1, 1, 1])  # Length, width, height (in mm)
+    num_elements = [1, 1, 1]
     components = [1, 2, 3]  # Geometric components
     dimension = 3  # 3D coordinates
     number_gauss_xi = 4  # Number of Gauss points used for quadrature
-    num_load_increments = 1
-    results_folder = './'
-    numDataPointsPerFace = 6
+    scaling_type = iron.FieldScalingTypes.NONE
 
     # Get the number of computational nodes and this computational node number
     numberOfComputationalNodes = iron.ComputationalNumberOfNodesGet()
@@ -81,11 +79,11 @@ def setup_mesh():
                                     region)
     geometric_field.MeshDecompositionSet(decomposition)
     geometric_field.TypeSet(iron.FieldTypes.GEOMETRIC)
-    geometric_field.VariableLabelSet(iron.FieldVariableTypes.U,
-                                         "Geometry")
+    geometric_field.VariableLabelSet(iron.FieldVariableTypes.U, "geometry")
     for component in components:
         geometric_field.ComponentMeshComponentSet(
             iron.FieldVariableTypes.U, component, 1)
+    geometric_field.ScalingTypeSet(scaling_type)
     geometric_field.CreateFinish()
 
     # Update the geometric field parameters from generated mesh
@@ -93,11 +91,20 @@ def setup_mesh():
         geometric_field)
     generated_mesh.Destroy()
     
-    return region, decomposition, geometric_field
+    return region, decomposition, mesh, geometric_field
 
 if __name__ == '__main__':
     
-    region, decomposition, geometric_field = setup_mesh()
+    # Define mesh
+    region, decomposition, mesh, geometric_field = setup_mesh()
+    # Define data
+    _, element_nums = mesh_tools.num_element_get(mesh, mesh_component=1)
+    values, xi, elements = mesh_tools.interpolate_opencmiss_field_sample(
+        geometric_field, element_ids=element_nums, num_values=10, dimension=3,
+        derivative_number=1, unique=True, geometric_field=geometric_field)
+    
+
+    # Define fiting parameters
     tau = 0.01
     kappa = 0.005
     smoothing_parameters = ([
@@ -111,17 +118,20 @@ if __name__ == '__main__':
         kappa,  # kappa_13
         kappa])  # kappa_23
 
-    fitting = mesh_tools.Fitting()
+    fitting = mesh_tools.Fitting(fitting_type='data')
     fitting.set_results_folder('results/')
     fitting.set_region(region)
+    fitting.set_mesh(mesh)
     fitting.set_decomposition(decomposition)
     fitting.set_geometric_field(geometric_field)
+    fitting.set_data_positions(
+        element_xi=xi, element_nums=elements, data_point_positions=values)
+    fitting.set_data_values(values=values, labels=['a', 'b', 'c'])
     fitting.setup_fields()
-    fitting.set_data_position(xi=[], position=[])
-    #fitting.set_data_values(values, labels)
     fitting.setup_equations()
     fitting.setup_problem()
     fitting.set_smoothing_parameters(smoothing_parameters)
     fitting.solve()
+    fitting.export(iteration_num=1)
     fitting.finalise()
 
