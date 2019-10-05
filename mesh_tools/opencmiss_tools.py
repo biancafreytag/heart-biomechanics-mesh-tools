@@ -44,8 +44,9 @@ def interpolate_opencmiss_field(field, element_ids=[], xi=None, num_values=4,dim
 
 
 def interpolate_opencmiss_field_sample(
-        field, element_ids=None, num_values=4, dimension=3, derivative_number=1,
-        face=None, value=0., unique=False, geometric_field=None):
+        field, element_ids=None, num_values=4, dimension=3,
+        derivative_number=1, face=None, value=0., unique=False,
+        geometric_field=None, debug=False):
     """ Interpolates and OpenCMISS field at selected points along xi directions
 
 
@@ -83,7 +84,7 @@ def interpolate_opencmiss_field_sample(
     total_num_values = num_Xe * num_elem_values
     values = np.zeros((num_Xe, num_elem_values, dimension))
     xi = np.zeros((num_Xe, num_elem_values, dimension))
-    elements = np.zeros((num_Xe, num_elem_values, 1))
+    elements = np.zeros((num_Xe, num_elem_values, 1), dtype=int)
 
     for elem_idx, element_id in enumerate(element_ids):
         for point_idx in range(num_elem_values):
@@ -104,28 +105,34 @@ def interpolate_opencmiss_field_sample(
         # Evaluate geometric field at xi values and select general field values
         # that only have unique coordinates
         if geometric_field is None:
-            raise ValueError('Geometric field is required for returning unique field values')
-        geometric_values = np.zeros((num_Xe, num_elem_values, dimension))
-        for elem_idx, element_id in enumerate(element_ids):
-            for point_idx in range(num_elem_values):
-                single_xi = XiNd[point_idx, :]
-                geometric_values[elem_idx, point_idx,
-                :] = geometric_field.ParameterSetInterpolateSingleXiDP(
-                    iron.FieldVariableTypes.U,
-                    iron.FieldParameterSetTypes.VALUES, derivative_number,
-                    int(element_id), single_xi, dimension)
-
-        # Reshape interpolated field values into a vector
-        geometric_values = np.reshape(
-            geometric_values, (total_num_values, dimension))
-
+            raise ValueError(
+                'Geometric field is required for returning unique field values')
+        geometric_values = np.zeros((total_num_values, dimension))
+        for point_idx in range(total_num_values):
+            geometric_values[point_idx,
+            :] = geometric_field.ParameterSetInterpolateSingleXiDP(
+                iron.FieldVariableTypes.U,
+                iron.FieldParameterSetTypes.VALUES, derivative_number,
+                int(elements[point_idx]), xi[point_idx, :], dimension)
+            if debug:
+                print('Point num         : ', point_idx+1)
+                print('  True value      : ', geometric_values[point_idx, :])
+                print('  Projected value : ', values[point_idx, :])
         # Identify unique geometric field values
         _, indices = utilities.np_1_13_unique(
             geometric_values, axis=0, return_index=True)
+
         # Select only unique general field values
         values = values[sorted(indices), :]
         xi = xi[sorted(indices), :]
         elements = elements[sorted(indices)]
+
+        if debug:
+            for point_idx in range(len(elements)):
+                print('Point num: ', point_idx+1)
+                print('  element num   : ', elements[point_idx])
+                print('  xi            : ', xi[point_idx, :])
+                print('  position      : ', values[point_idx, :])
 
     return values, xi, elements
 
