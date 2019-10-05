@@ -2,6 +2,7 @@ import os
 import numpy as np
 from opencmiss.iron import iron
 
+
 class Fitting:
     """
     Fitting class
@@ -27,10 +28,10 @@ class Fitting:
             self.kappa,  # kappa_33
             self.kappa,  # kappa_13
             self.kappa])  # kappa_23
-        
+
         # Set fitting data default
         self.interpolation_type = iron.FieldInterpolationTypes.GAUSS_POINT_BASED
-        
+
         # OpenCMISS user numbers
         self.data_field_user_num = 100 + instance
         self.dependent_field_user_num = 101 + instance
@@ -38,7 +39,7 @@ class Fitting:
         self.equations_set_field_user_num = 103 + instance
         self.equations_set_user_num = 100 + instance
         self.problem_user_num = 100 + instance
-        
+
         # Instances for setting up fitting problems
         self.data_field = iron.Field()
         self.dependent_field = iron.Field()
@@ -70,8 +71,9 @@ class Fitting:
                                        iron.ProblemSubtypes.STATIC_FITTING])
 
     def set_data_positions(
-            self, element_xi=None, element_nums=None, 
-            data_point_positions=None, dataset_num=1, data_point_ids=None):
+            self, element_xi=None, element_nums=None,
+            data_point_positions=None, dataset_num=1, data_point_ids=None,
+            debug=False):
         """
         Sets positions of data as mesh xi or data positions
         """
@@ -81,9 +83,8 @@ class Fitting:
         self.data_element_nums = element_nums
         self.data_element_xi = element_xi
         self.num_data_points = self.data_point_positions.shape[0]
-        num_components = self.data_point_positions.shape[1]
         if data_point_ids is None:
-            data_point_ids = np.arange(self.num_data_points)+1
+            data_point_ids = np.arange(self.num_data_points) + 1
         self.data_point_ids = data_point_ids
 
         if self.num_data_points != len(self.data_point_ids):
@@ -103,30 +104,43 @@ class Fitting:
             iron.FieldVariableTypes.U)
         self.data_projection.ProjectionTypeSet(
             iron.DataProjectionProjectionTypes.ALL_ELEMENTS)
+        self.data_projection.NumberOfClosestElementsSet(1)
+        self.data_projection.AbsoluteToleranceSet(1.0e-14)
+        self.data_projection.RelativeToleranceSet(1.0e-14)
+        self.data_projection.MaximumNumberOfIterationsSet(int(1e6))
+        self.data_projection.StartingXiSet(np.array(self.data_element_xi))
+        for idx, point_id in enumerate(self.data_point_ids):
+            self.data_projection.ProjectionDataCandidateElementsSet(
+                [int(self.data_point_ids[idx])],
+                [int(element_nums[idx])])
         self.data_projection.CreateFinish()
 
-        # Evaluate data projection based on geometric field
-        self.data_projection.DataPointsProjectionEvaluate(
-            iron.FieldParameterSetTypes.VALUES)
-        #
-        # if element_xi is not None:
-        #     for idx, point_id in enumerate(self.data_point_ids):
-        #         xi = self.data_projection.ResultProjectionXiGet(
-        #             int(point_id), 3)
-        #         self.data_projection.ResultProjectionXiSet(
-        #             int(point_id), element_xi[idx, :])
-        #         e_num =self.data_projection.ResultElementNumberGet(
-        #             int(point_id))
-        #         self.data_projection.ResultElementNumberSet(
-        #             int(point_id), int(element_nums[idx]))
-        #         print('Point            : ', point_id)
-        #         print('xi true          : ', element_xi[idx, :])
-        #         print('xi projected     : ', xi)
-        #         print('element true     : ', int(element_nums[idx]))
-        #         print('element projected: ', e_num)
-        #
-        # else:
-        #     raise ValueError('Projection not implemented, element_xi required')
+        if element_xi is not None:
+            # Use specified element xi and element numbers as projection
+            # results
+            for idx, point_id in enumerate(self.data_point_ids):
+                if debug:
+                    xi = self.data_projection.ResultProjectionXiGet(
+                        int(point_id), 3)
+                    e_num = self.data_projection.ResultElementNumberGet(
+                        int(point_id))
+                    print('Point: ', point_id)
+                    print('xi true          : ', element_xi[idx, :])
+                    print('xi projected     : ', xi)
+                    print('element true     : ', int(element_nums[idx]))
+                    print('element projected: ', e_num)
+                self.data_projection.ResultProjectionXiSet(
+                    int(point_id), element_xi[idx, :])
+                self.data_projection.ResultElementNumberSet(
+                    int(point_id), int(element_nums[idx]))
+        else:
+            # Perform projection
+            self.data_projection.DataPointsProjectionEvaluate(
+                iron.FieldParameterSetTypes.VALUES)
+
+            if debug:
+                self.data_projection.ResultAnalysisOutput(
+                    os.path.join(self.results_folder, 'projection_results'))
 
         # Create mesh topology for data projection
         self.mesh.TopologyDataPointsCalculateProjection(self.data_projection)
@@ -140,7 +154,7 @@ class Fitting:
         self.data_values = np.array(values)
         self.data_labels = labels
         self.num_data_components = self.data_values.shape[1]
-        
+
     def set_results_folder(self, results_folder):
         """
         Sets results folder for exporting solutions
@@ -192,7 +206,7 @@ class Fitting:
             self.kappa,  # kappa_13
             self.kappa])  # kappa_23
         self.update_material_field()
-        
+
     def set_region(self, region):
         """
         Sets region for fitting.
@@ -204,13 +218,13 @@ class Fitting:
         Sets mesh for fitting.
         """
         self.mesh = mesh
-        
+
     def set_decomposition(self, decomposition):
         """
         Sets decomposition for fitting.
         """
         self.decomposition = decomposition
-        
+
     def set_geometric_field(self, geometric_field):
         """
         Sets geometric field for fitting.
@@ -248,7 +262,8 @@ class Fitting:
                     variable_type, component, self.data_interpolation_type)
                 if variable_type == iron.FieldVariableTypes.U:
                     self.data_field.ComponentLabelSet(
-                        variable_type, component, self.data_labels[component_idx])
+                        variable_type, component,
+                        self.data_labels[component_idx])
         self.data_field.ScalingTypeSet(scaling_type)
         self.data_field.DataProjectionSet(self.data_projection)
         self.data_field.CreateFinish()
@@ -264,7 +279,7 @@ class Fitting:
         variable_types = ([iron.FieldVariableTypes.U,
                            iron.FieldVariableTypes.DELUDELN])
         num_variables = len(variable_types)
-        
+
         self.dependent_field.CreateStart(
             self.dependent_field_user_num, self.region)
         self.dependent_field.TypeSet(iron.FieldTypes.GENERAL)
@@ -308,7 +323,7 @@ class Fitting:
 
         # Set data field
         self.update_data_field()
-        
+
     def update_material_field(self):
         """
         Updates the material field with a set of smoothing parameters.
@@ -327,16 +342,24 @@ class Fitting:
                 iron.FieldInterpolationTypes.DATA_POINT_BASED:
             raise ValueError('Only setting data point based fields supported')
 
-        for idx, point_id in enumerate(self.data_point_ids):
-            element_num = self.data_projection.ResultElementNumberGet(
-                int(point_id))
-            for component_idx, component in enumerate(
-                    np.arange(self.num_data_components)+1):
-                self.data_field.ParameterSetUpdateElementDataPointDP(
-                    iron.FieldVariableTypes.U, 
-                    iron.FieldParameterSetTypes.VALUES,
-                    element_num, int(point_id),
-                    int(component), self.data_values[idx, component_idx])
+        element_nums = np.unique(self.data_element_nums)
+        for element_num in element_nums:
+            num_projected_data_points = \
+                self.decomposition.TopologyNumberOfElementDataPointsGet(
+                int(element_num))
+            for elem_data_point_num in range(1, num_projected_data_points + 1):
+                data_point_num = \
+                    self.decomposition.TopologyElementDataPointUserNumberGet(
+                    int(element_num), elem_data_point_num)
+                data_point_idx = np.where(
+                    self.data_point_ids==data_point_num)[0].item()
+                for component_idx, component in enumerate(
+                        np.arange(self.num_data_components) + 1):
+                    self.data_field.ParameterSetUpdateElementDataPointDP(
+                        iron.FieldVariableTypes.U,
+                        iron.FieldParameterSetTypes.VALUES, int(element_num),
+                        elem_data_point_num, int(component),
+                        self.data_values[data_point_idx, component_idx])
 
     def setup_equations(self):
         """
@@ -361,12 +384,12 @@ class Fitting:
                                                 self.material_field)
         self.equations_set.MaterialsCreateFinish()
 
-        #self.equations_set.DerivedCreateStart(
+        # self.equations_set.DerivedCreateStart(
         #    self.data_field_user_num, self.data_field)
-        #self.equations_set.DerivedVariableSet(
+        # self.equations_set.DerivedVariableSet(
         #    iron.EquationsSetDerivedTensorTypes.CAUCHY_STRESS,
         #    iron.FieldVariableTypes.U)
-        #self.equations_set.DerivedCreateFinish()
+        # self.equations_set.DerivedCreateFinish()
 
         self.equations = iron.Equations()
         self.equations_set.EquationsCreateStart(self.equations)
@@ -408,7 +431,7 @@ class Fitting:
         self.solver.SolverEquationsGet(self.solver_equations)
         self.solver_equations.SparsityTypeSet(
             iron.SolverEquationsSparsityTypes.SPARSE)
-        equationsSetIndex = self.solver_equations.EquationsSetAdd(
+        _ = self.solver_equations.EquationsSetAdd(
             self.equations_set)
         self.problem.SolverEquationsCreateFinish()
 
@@ -440,10 +463,25 @@ class Fitting:
         export_path = os.path.join(
             self.results_folder,
             "fitting_results_iteration_" + str(iteration_num))
-    
+
         fields = iron.Fields()
         fields.AddField(self.geometric_field)
         fields.AddField(self.dependent_field)
+        fields.NodesExport(export_path, "FORTRAN")
+        fields.ElementsExport(export_path, "FORTRAN")
+        fields.Finalise()
+
+    def export_geometric_field(self, iteration_num):
+        """
+        Export the fitting solutions for the selected iteration number.
+        """
+        self.set_results_folder(self.results_folder)
+        export_path = os.path.join(
+            self.results_folder,
+            "fitting_results_iteration_" + str(iteration_num))
+
+        fields = iron.Fields()
+        fields.AddField(self.geometric_field)
         fields.NodesExport(export_path, "FORTRAN")
         fields.ElementsExport(export_path, "FORTRAN")
         fields.Finalise()

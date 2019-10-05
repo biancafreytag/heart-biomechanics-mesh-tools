@@ -13,6 +13,8 @@ foreach my $i (1..$tEnd) {
 }
 gfx read element "$path/fitting_results_iteration_1.part0.exelem" region mesh;
 
+gfx r data $path/data_points.exdata region data
+
 # calculate the faces
 gfx define faces egroup "mesh"
 gfx define field "mesh/fitted_field_x" component fitted_field.1
@@ -24,6 +26,8 @@ gfx define field "mesh/geometry_y" component geometry.y
 gfx define field "mesh/geometry_z" component geometry.z
 
 gfx set time $final_t
+
+gfx modify g_element /data/ points domain_datapoints coordinate coordinates tessellation default_points LOCAL glyph sphere size "0.05*0.05*0.05" offset 0,0,0 font default select_on material default selected_material default_selected render_shaded;
 
 gfx modify g_element "/" general clear;
 gfx modify g_element /mesh/ general clear;

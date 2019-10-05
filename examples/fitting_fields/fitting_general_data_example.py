@@ -1,8 +1,12 @@
+import os
 import numpy as np
 from opencmiss.iron import iron
 import mesh_tools
 
-def setup_mesh():
+def generate_opencmiss_geometry(
+        interpolation=iron.BasisInterpolationSpecifications.LINEAR_LAGRANGE,
+        region_label='region', num_elements=None, dimensions=None,
+        scaling_type=None):
     
     # OpenCMISS user numbers
     coor_sys_user_num = 1
@@ -22,13 +26,14 @@ def setup_mesh():
     decomposition = iron.Decomposition()
     geometric_field = iron.Field()
     
-    dimensions = np.array(
-        [1, 1, 1])  # Length, width, height (in mm)
-    num_elements = [1, 1, 1]
+    if dimensions is None:
+        dimensions = np.array([1, 1, 1])  # Length, width, height (in mm)
+    if num_elements is None:
+        num_elements = [1, 1, 1]
     components = [1, 2, 3]  # Geometric components
     dimension = 3  # 3D coordinates
-    number_gauss_xi = 4  # Number of Gauss points used for quadrature
-    scaling_type = iron.FieldScalingTypes.NONE
+    if scaling_type is None:
+        scaling_type = iron.FieldScalingTypes.NONE
 
     # Get the number of computational nodes and this computational node number
     numberOfComputationalNodes = iron.ComputationalNumberOfNodesGet()
@@ -41,7 +46,7 @@ def setup_mesh():
 
     # Create a region and assign the coordinate system to the region
     region.CreateStart(region_user_num, iron.WorldRegion)
-    region.LabelSet("Region 1")
+    region.LabelSet(region_label)
     region.CoordinateSystemSet(coordinate_system)
     region.CreateFinish()
 
@@ -49,23 +54,28 @@ def setup_mesh():
     basis.CreateStart(basis_user_num)
     basis.TypeSet(iron.BasisTypes.LAGRANGE_HERMITE_TP)
     basis.NumberOfXiSet(dimension)
-    basis.interpolationXi = [
-                                     iron.BasisInterpolationSpecifications.CUBIC_LAGRANGE] * dimension
-    basis.quadratureNumberOfGaussXi = [
-                                               number_gauss_xi] * dimension
+    basis.InterpolationXiSet([interpolation] * dimension)
+    # Set number of Gauss points used for quadrature
+    if interpolation == iron.BasisInterpolationSpecifications.LINEAR_LAGRANGE:
+        number_gauss_xi = 2
+    elif interpolation == \
+            iron.BasisInterpolationSpecifications.QUADRATIC_LAGRANGE:
+        number_gauss_xi = 3
+    elif interpolation == \
+            iron.BasisInterpolationSpecifications.CUBIC_LAGRANGE:
+        number_gauss_xi = 4
+    else:
+        raise ValueError('Interpolation not supported')
+    basis.QuadratureNumberOfGaussXiSet([number_gauss_xi] * dimension)
     basis.CreateFinish()
 
     # Start the creation of a generated mesh in the region
-    generated_mesh.CreateStart(generated_mesh_user_num,
-                                   region)
+    generated_mesh.CreateStart(generated_mesh_user_num, region)
     generated_mesh.TypeSet(iron.GeneratedMeshTypes.REGULAR)
     generated_mesh.BasisSet([basis])
-    generated_mesh.ExtentSet(
-        dimensions)  # Width, length, height
+    generated_mesh.ExtentSet(dimensions)  # Width, length, height
     generated_mesh.NumberOfElementsSet(num_elements)
-    # Finish the creation of a generated mesh in the region
-    generated_mesh.CreateFinish(mesh_user_num,
-                                    mesh)
+    generated_mesh.CreateFinish(mesh_user_num, mesh)
 
     # Create a decomposition for the mesh
     decomposition.CreateStart(decomposition_user_num, mesh)
@@ -75,8 +85,7 @@ def setup_mesh():
     decomposition.CreateFinish()
 
     # Create a field for the geometry
-    geometric_field.CreateStart(geometric_field_user_num,
-                                    region)
+    geometric_field.CreateStart(geometric_field_user_num, region)
     geometric_field.MeshDecompositionSet(decomposition)
     geometric_field.TypeSet(iron.FieldTypes.GEOMETRIC)
     geometric_field.VariableLabelSet(iron.FieldVariableTypes.U, "geometry")
@@ -87,8 +96,7 @@ def setup_mesh():
     geometric_field.CreateFinish()
 
     # Update the geometric field parameters from generated mesh
-    generated_mesh.GeometricParametersCalculate(
-        geometric_field)
+    generated_mesh.GeometricParametersCalculate(geometric_field)
     generated_mesh.Destroy()
     
     return region, decomposition, mesh, geometric_field
@@ -96,17 +104,25 @@ def setup_mesh():
 if __name__ == '__main__':
     
     # Define mesh
-    region, decomposition, mesh, geometric_field = setup_mesh()
+    interpolation = iron.BasisInterpolationSpecifications.CUBIC_LAGRANGE
+    num_elements = [2, 2, 2]
+    region, decomposition, mesh, geometric_field = generate_opencmiss_geometry(
+        interpolation=interpolation, 
+        num_elements=num_elements)
+
     # Define data
+    num_points_per_elem_xi = 4
     _, element_nums = mesh_tools.num_element_get(mesh, mesh_component=1)
     values, xi, elements = mesh_tools.interpolate_opencmiss_field_sample(
-        geometric_field, element_ids=element_nums, num_values=10, dimension=3,
-        derivative_number=1, unique=True, geometric_field=geometric_field)
-    
+        geometric_field, element_ids=element_nums, 
+        num_values=num_points_per_elem_xi, dimension=3, derivative_number=1,
+        unique=True, geometric_field=geometric_field)
+    mesh_tools.export_datapoints_exdata(
+        values, 'data_points', os.path.join('results/data_points'))
 
-    # Define fiting parameters
-    tau = 0.01
-    kappa = 0.005
+    # Define fitting parameters
+    tau = 0
+    kappa = 0
     smoothing_parameters = ([
         tau,  # tau_1
         kappa,  # kappa_11
