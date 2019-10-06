@@ -70,6 +70,11 @@ class Fitting:
                                        iron.ProblemTypes.DATA_FITTING,
                                        iron.ProblemSubtypes.STATIC_FITTING])
 
+        # Boundary condition parameters
+        self.dependent_field_mappings = False
+        self.num_mapped_dependent_field_nodes = 0
+        self.mapped_dependent_field_node_nums = None
+
     def set_data_positions(
             self, element_xi=None, element_nums=None,
             data_point_positions=None, dataset_num=1, data_point_ids=None,
@@ -231,11 +236,20 @@ class Fitting:
         """
         self.geometric_field = geometric_field
 
-    def setup_fields(
-            self, scaling_type=iron.FieldScalingTypes.NONE):
+    def set_field_mapping_constraints(self, mapped_node_nums=None):
         """
         Sets up the field for a fitting problem.
         """
+        self.dependent_field_mappings = True
+        self.num_mapped_dependent_field_nodes = len(mapped_node_nums)
+        self.mapped_dependent_field_node_nums = mapped_node_nums
+
+    def setup_fields(self, scaling_type=None):
+        """
+        Sets up the field for a fitting problem.
+        """
+        if scaling_type is None:
+            scaling_type = iron.FieldScalingTypes.NONE
         components = range(1, self.num_data_components + 1)
         mesh_component = 1
 
@@ -438,6 +452,19 @@ class Fitting:
         self.boundary_conditions = iron.BoundaryConditions()
         self.solver_equations.BoundaryConditionsCreateStart(
             self.boundary_conditions)
+        # Mapping constraints
+        if self.dependent_field_mappings:
+            version = 1
+            for mapped_node_idx in range(
+                    self.num_mapped_dependent_field_nodes):
+                for component in range(1, self.num_data_components + 1):
+                    self.boundary_conditions.ConstrainNodeDofsEqual(
+                        self.dependent_field, iron.FieldVariableTypes.U,
+                        version,
+                        iron.GlobalDerivativeConstants.NO_GLOBAL_DERIV,
+                        component,
+                        self.mapped_dependent_field_node_nums[mapped_node_idx, :],
+                        1.0)
         self.solver_equations.BoundaryConditionsCreateFinish()
 
     def solve(self):
