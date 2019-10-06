@@ -70,3 +70,44 @@ def exportDatapointsErrorExdata(data, error, label, filename):
                 field_id.write(
                     ' {0:.12E}\n'.format(abs(error[point_idx, value_idx])))
     field_id.close()
+
+def export_data_points_exdata(positions, label, filename, data=None):
+    # Shape of data should be a [num_datapoints,dim] numpy array.
+    num_fields = 1
+    num_points = positions.shape[0]
+    num_geometric_components = positions.shape[1]
+    if data is not None:
+        num_fields = 2
+        num_data_components = data.shape[1]
+
+    # Write header
+    field_id = open(filename + '.exdata', 'w')
+    field_id.write(' Group name: {0}\n'.format(label))
+    field_id.write(' #Fields={0}\n'.format(num_fields))
+    field_id.write(
+        ' 1) coordinates, coordinate, rectangular cartesian, #Components=3\n')
+    field_id.write('   x.  Value index= 1, #Derivatives=0\n')
+    field_id.write('   y.  Value index= 2, #Derivatives=0\n')
+    field_id.write('   z.  Value index= 3, #Derivatives=0\n')
+    if data is not None:
+        field_id.write(
+            ' 2) error, field, rectangular cartesian, #Components={0}\n'.format(
+                num_data_components))
+        for idx, data_component in enumerate(range(1, num_data_components + 1)):
+            field_id.write('   {0}.  Value index= {1}, #Derivatives=0\n'.format(
+                data_component, idx + 4))
+
+    # Write field values
+    for point_idx, point in enumerate(range(1, num_points + 1)):
+        if ~np.isnan(positions[point_idx, :]).any():
+            field_id.write(' Node: {0}\n'.format(point))
+            # Write geometric components
+            for value_idx in range(num_geometric_components):
+                field_id.write(
+                    ' {0:.12E}\n'.format(positions[point_idx, value_idx]))
+            # Write data components
+            if data is not None:
+                for value_idx in range(num_data_components):
+                    field_id.write(
+                        ' {0:.12E}\n'.format(data[point_idx, value_idx]))
+    field_id.close()
