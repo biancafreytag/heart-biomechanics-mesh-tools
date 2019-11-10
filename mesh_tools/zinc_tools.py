@@ -1,6 +1,8 @@
 """
 Tools for evaluating zinc meshes (scaffolds)
 """
+import numpy as np
+
 from opencmiss.zinc.context import Context
 from opencmiss.zinc.status import OK as ZINC_OK
 from scaffoldmaker.utils import zinc_utils
@@ -67,6 +69,8 @@ class Zinc_mesh:
         xi_loc - The xi coordinates to evaluate.
         elements -The elements to evaluate the xi coordinates for
         """
+        num_xi_locs = np.array(xi_loc).shape[0]
+        coords = np.zeros((num_xi_locs, self.dim))
 
         context = Context("Scaffold")
         region = context.getDefaultRegion()
@@ -87,18 +91,21 @@ class Zinc_mesh:
             element = el_iter.next()
         mesh_elements = elemDict
 
-        xi = xi_loc
+        xi = xi_loc[0]
         if len(xi) != self.dim:
             raise TypeError("Number of xi coordinates is not valid for {} dimension".format(self.dim))
 
         cache = field_module.createFieldcache()
-        for element in elements:
-            cache.setMeshLocation(mesh_elements[element], xi)
+        for xi_idx, xi in enumerate(xi_loc):
+            element = elements[xi_idx]
+            cache.setMeshLocation(mesh_elements[element], xi.tolist())
             result, out_values = field.evaluateReal(cache, self.dim)
             if result == ZINC_OK:
-                print(mesh_elements[element].getIdentifier(), out_values)
+                coords[xi_idx, :] = out_values
             else:
                 raise ValueError('Error when evaluating element {0}, at xi {1}'.format(element, xi))
+
+        return coords
 
     def export_vtk(self, filename):
 
