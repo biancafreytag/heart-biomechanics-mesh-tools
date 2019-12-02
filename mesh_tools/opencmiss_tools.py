@@ -44,7 +44,7 @@ def interpolate_opencmiss_field(field, element_ids=[], xi=None, num_values=4,dim
 
 
 def interpolate_opencmiss_field_sample(
-        field, element_ids=None, num_values=4, dimension=3,
+        field, element_ids=None, num_values=4, dimension=3, num_components=3,
         derivative_number=1, face=None, value=0., unique=False,
         geometric_field=None, debug=False):
     """ Interpolates and OpenCMISS field at selected points along xi directions
@@ -59,8 +59,13 @@ def interpolate_opencmiss_field_sample(
         num_values (int): The number of values to interpolate at along each
           element xi direction
 
-        dimension (int): Dimension of the field being interpolated
+        dimension (int): dimension of the field being interpolated
           (e.g. 3 for 3D)
+
+        num_components (int): number of field components to interpolate
+          (e.g. 3 for 3D)
+        Todo Identify number of components directly from the OpenCMISS field
+             object
 
         derivative_number (int): The field derivative to interpolate
 
@@ -74,7 +79,7 @@ def interpolate_opencmiss_field_sample(
         geometric_field(OpenCMISS field object): Required for unique option
 
         Todo replace face and value with OpenCMISS face variable which combines
-        the two variables into one.
+             the two variables into one.
 
     Returns:
         values, xi, elements
@@ -90,7 +95,7 @@ def interpolate_opencmiss_field_sample(
     num_elem_values = XiNd.shape[0]
     num_Xe = len(element_ids)
     total_num_values = num_Xe * num_elem_values
-    values = np.zeros((num_Xe, num_elem_values, dimension))
+    values = np.zeros((num_Xe, num_elem_values, num_components))
     xi = np.zeros((num_Xe, num_elem_values, dimension))
     elements = np.zeros((num_Xe, num_elem_values, 1), dtype=int)
 
@@ -100,12 +105,12 @@ def interpolate_opencmiss_field_sample(
             values[elem_idx, point_idx,
             :] = field.ParameterSetInterpolateSingleXiDP(
                 iron.FieldVariableTypes.U, iron.FieldParameterSetTypes.VALUES,
-                derivative_number, int(element_id), single_xi, dimension)
+                derivative_number, int(element_id), single_xi, num_components)
         xi[elem_idx, :, :] = XiNd
         elements[elem_idx, :] = element_id
 
     # Reshape interpolated field values into a vector
-    values = np.reshape(values, (total_num_values, dimension))
+    values = np.reshape(values, (total_num_values, num_components))
     xi = np.reshape(xi, (total_num_values, dimension))
     elements = np.reshape(elements, (total_num_values))
 
@@ -164,7 +169,7 @@ def get_field_values(field, node_nums, derivative=1, dimension=3,
         for component_idx, component in enumerate(range(1, dimension + 1)):
             coordinates[node_idx, component_idx] = field.ParameterSetGetNodeDP(
                 variable, iron.FieldParameterSetTypes.VALUES, 1, derivative,
-                node, component)
+                int(node), component)
     return coordinates
 
 
