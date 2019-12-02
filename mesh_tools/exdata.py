@@ -71,7 +71,8 @@ def exportDatapointsErrorExdata(data, error, label, filename):
                     ' {0:.12E}\n'.format(abs(error[point_idx, value_idx])))
     field_id.close()
 
-def export_data_points_exdata(positions, label, filename, data=None):
+def export_data_points_exdata(
+        positions, label, filename, data=None, component_labels=None):
     # Shape of data should be a [num_datapoints,dim] numpy array.
     num_fields = 1
     num_points = positions.shape[0]
@@ -79,6 +80,9 @@ def export_data_points_exdata(positions, label, filename, data=None):
     if data is not None:
         num_fields = 2
         num_data_components = data.shape[1]
+        if component_labels is None:
+            # Assign component labels
+            component_labels = list(range(1, num_data_components + 1))
 
     # Write header
     field_id = open(filename + '.exdata', 'w')
@@ -93,9 +97,9 @@ def export_data_points_exdata(positions, label, filename, data=None):
         field_id.write(
             ' 2) error, field, rectangular cartesian, #Components={0}\n'.format(
                 num_data_components))
-        for idx, data_component in enumerate(range(1, num_data_components + 1)):
+        for data_component_idx, component_label in enumerate(component_labels):
             field_id.write('   {0}.  Value index= {1}, #Derivatives=0\n'.format(
-                data_component, idx + 4))
+                component_label, data_component_idx + 4))
 
     # Write field values
     for point_idx, point in enumerate(range(1, num_points + 1)):
