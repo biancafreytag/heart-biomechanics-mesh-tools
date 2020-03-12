@@ -173,21 +173,22 @@ def get_field_values(field, node_nums, derivative=1, dimension=3,
     return coordinates
 
 
-def set_field_values(field, node_nums, coordinates, derivative=1,
+def set_field_values(field, node_nums, values, derivative=1,
                      variable=iron.FieldVariableTypes.U,
                      update_scale_factors=False):
     """
-    Update the field parameters
+    Update the field parameters (only sets components 1 to number of
+    coordinates of the input values array)
     """
     if update_scale_factors:
         field.ParameterSetUpdateStart(iron.FieldVariableTypes.U,
                                       iron.FieldParameterSetTypes.VALUES)
     for node_idx, node in enumerate(node_nums):
         for component_idx, component in enumerate(
-                range(1, coordinates.shape[1] + 1)):
+                range(1, values.shape[1] + 1)):
             field.ParameterSetUpdateNodeDP(
                 variable, iron.FieldParameterSetTypes.VALUES, 1, derivative,
-                node, component, coordinates[node_idx, component_idx])
+                int(node), component, values[node_idx, component_idx])
 
     if update_scale_factors:
         field.ParameterSetUpdateFinish(iron.FieldVariableTypes.U,
@@ -325,3 +326,68 @@ def generate_opencmiss_geometry(
     generated_mesh.Destroy()
 
     return region, decomposition, mesh, geometric_field
+
+def generate_opencmiss_region(
+        interpolation=None, region_label='region', dimension=2):
+    """ Generates an OpenCMISS geometry (mesh and geometric field)
+
+
+    Args:
+        interpolation (iron.BasisInterpolationSpecifications):
+          Element interpolation e.g. LINEAR_LAGRANGE
+        region_label (str): Region name
+
+    Returns:
+        region, decomposition, mesh, geometric_field
+    """
+
+    # OpenCMISS user numbers
+    coor_sys_user_num = 1
+    region_user_num = 1
+    basis_user_num = 1
+
+    # Instances for setting up OpenCMISS mesh
+    coordinate_system = iron.CoordinateSystem()
+    region = iron.Region()
+    basis = iron.Basis()
+
+    if interpolation is None:
+        interpolation = iron.BasisInterpolationSpecifications.LINEAR_LAGRANGE
+
+    components = [1, 2, 3]  # Geometric components
+
+    # Get the number of computational nodes and this computational node number
+    numberOfComputationalNodes = iron.ComputationalNumberOfNodesGet()
+    computationalNodeNumber = iron.ComputationalNodeNumberGet()
+
+    # Create a 3D rectangular cartesian coordinate system
+    coordinate_system.CreateStart(coor_sys_user_num)
+    coordinate_system.DimensionSet(3)
+    coordinate_system.CreateFinish()
+
+    # Create a region and assign the coordinate system to the region
+    region.CreateStart(region_user_num, iron.WorldRegion)
+    region.LabelSet(region_label)
+    region.CoordinateSystemSet(coordinate_system)
+    region.CreateFinish()
+
+    # Define basis
+    basis.CreateStart(basis_user_num)
+    basis.TypeSet(iron.BasisTypes.LAGRANGE_HERMITE_TP)
+    basis.NumberOfXiSet(dimension)
+    basis.InterpolationXiSet([interpolation] * dimension)
+    # Set number of Gauss points used for quadrature
+    if interpolation == iron.BasisInterpolationSpecifications.LINEAR_LAGRANGE:
+        number_gauss_xi = 2
+    elif interpolation == \
+            iron.BasisInterpolationSpecifications.QUADRATIC_LAGRANGE:
+        number_gauss_xi = 3
+    elif interpolation == \
+            iron.BasisInterpolationSpecifications.CUBIC_LAGRANGE:
+        number_gauss_xi = 4
+    else:
+        raise ValueError('Interpolation not supported')
+    basis.QuadratureNumberOfGaussXiSet([number_gauss_xi] * dimension)
+    basis.CreateFinish()
+
+    return region, basis
