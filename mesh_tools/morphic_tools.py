@@ -139,3 +139,70 @@ def visualise_mesh(
                     fig.plot_text(
                         '{0}_Text'.format(label), mesh.get_nodes(nodes), nodes,
                         size=3)
+
+def renumber_mesh(mesh, node_offset=0, element_offset=0, label='',
+                  debug=False):
+    """
+    Renumbers a mesh sequentially
+
+    Keyword arguments:
+    mesh -- morphic mesh to renumber
+    node_offset -- node offset of the renumbered mesh
+    element_offset -- element offset of the renumbered mesh
+    label -- label of the renumbered mesh
+    debug -- print debug output
+    """
+    # Create mesh
+    import morphic
+    renumbered_mesh = morphic.Mesh()
+
+    node_ids = mesh.get_node_ids(group='_default')[1]
+    mapping = range(len(node_ids))
+    renumbered_node_ids = range(1, len(node_ids) + 1)
+
+    # Renumber nodes
+    for node_idx, morphic_node in enumerate(mesh.nodes):
+        renumbered_node_id = renumbered_node_ids[node_idx] + node_offset
+        if debug:
+            print('Morhpic node {0} renumbered to {1}'.format(
+                morphic_node.id, renumbered_node_id))
+        renumbered_mesh.add_stdnode(
+            renumbered_node_id, morphic_node.values, group='_default')
+
+    for element_idx, element in enumerate(mesh.elements):
+        # Renumber element nodes
+        renumbered_element_node_ids = []
+        for element_node_id in element.node_ids:
+            renumbered_node_ids = node_ids.index(element_node_id) + 1
+            renumbered_element_node_ids.append(
+                renumbered_node_ids + node_offset)
+        # Add renumbered elements to new mesh
+        if debug:
+            print('  Element nodes', renumbered_element_node_ids)
+        renumbered_mesh.add_element(
+            element_idx + 1 + element_offset, ['L1', 'L1'],
+            renumbered_element_node_ids)
+
+    renumbered_mesh.generate(True)
+    renumbered_mesh.label = label
+
+    # Copy metadata
+    renumbered_mesh.metadata = mesh.metadata
+
+    try:
+        # Copy node groups
+        for key, morphic_nodes in mesh.nodes.groups.iteritems():
+            ids = [node_ids.index(node.id) + 1 + node_offset for node in
+                   morphic_nodes]
+            for node in renumbered_mesh.nodes[ids]:
+                node.add_to_group(key)
+
+        # Copy element groups
+        for key, morphic_elements in mesh.elements.groups.iteritems():
+            ids = [elem.id + element_offset for elem in morphic_elements]
+            for elem in renumbered_mesh.elements[ids]:
+                elem.add_to_group(key)
+    except:
+        pass
+
+    return renumbered_mesh
