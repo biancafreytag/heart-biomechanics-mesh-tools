@@ -21,6 +21,8 @@ if __name__ == '__main__':
         geometric_field, element_ids=element_nums, 
         num_values=num_points_per_elem_xi, dimension=3, derivative_number=1,
         unique=True, geometric_field=geometric_field)
+    if not os.path.exists('results'):
+        os.makedirs('results')
     mesh_tools.export_datapoints_exdata(
         values, 'data_points', os.path.join('results/data_points'))
 
