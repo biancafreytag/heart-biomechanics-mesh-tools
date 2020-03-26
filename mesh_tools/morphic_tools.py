@@ -206,3 +206,34 @@ def renumber_mesh(mesh, node_offset=0, element_offset=0, label='',
         pass
 
     return renumbered_mesh
+
+def surface_mesh(vol, face_node_idxs=None, label=''):
+    """
+    Generates a surface mesh from a volume mesh
+
+    Keyword arguments:
+    vol -- morphic volume mesh
+    face_node_idxs -- volume mesh face nodes idxs to include in surface mesh
+    label -- label of the surface mesh
+    """
+    # Create mesh
+    import morphic
+    surf = morphic.Mesh()
+
+    nd_labels = []
+    for element_idx, element in enumerate(vol.elements):
+        nd_labels.append(np.array(element.node_ids)[face_node_idxs])
+    nd_labels = np.unique(np.array(nd_labels).flatten())
+    for nd in nd_labels:
+        surf.add_stdnode(nd, vol.get_nodes(nd, group=b'_default')[0],
+            group='_default')
+
+    for element_idx, element in enumerate(vol.elements):
+        surf_element_nodes = np.array(element.node_ids)[face_node_idxs]
+        surf.add_element(
+            element.id, ['L3', 'L3'], surf_element_nodes)
+
+    surf.generate(True)
+    surf.label = label
+
+    return surf
