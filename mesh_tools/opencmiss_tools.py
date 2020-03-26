@@ -49,7 +49,6 @@ def interpolate_opencmiss_field_sample(
         geometric_field=None, debug=False):
     """ Interpolates and OpenCMISS field at selected points along xi directions
 
-
     Args:
         field (OpenCMISS field object): The general field to interpolate
 
