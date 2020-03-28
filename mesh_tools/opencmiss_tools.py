@@ -132,7 +132,11 @@ def interpolate_opencmiss_field_sample(
                 print('  Projected value : ', values[point_idx, :])
         # Identify unique geometric field values
         _, indices = utilities.np_1_13_unique(
-            geometric_values, axis=0, return_index=True)
+            np.vstack((
+                geometric_values[:, 0].round(decimals=4),
+                geometric_values[:, 1].round(decimals=4),
+                geometric_values[:, 2].round(decimals=4))).T,
+            axis=0, return_index=True)
 
         # Select only unique general field values
         values = values[sorted(indices), :]
