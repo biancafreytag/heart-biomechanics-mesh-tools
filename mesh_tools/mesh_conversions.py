@@ -227,8 +227,9 @@ def morphic_to_OpenCMISS(morphicMesh, region, basis, meshUserNumber,
     return mesh, coordinates, node_list, element_list
 
 
-def OpenCMISS_to_morphic(c_mesh, geometric_field,
-                      dimension=2, interpolation='linear'):
+def OpenCMISS_to_morphic(
+        c_mesh, geometric_field, element_nums, node_nums, dimension=2,
+        interpolation='linear'):
     """Convert an OpenCMISS mesh to a morphic mesh.
 
     Only Linear lagrange elements supported.
@@ -246,26 +247,21 @@ def OpenCMISS_to_morphic(c_mesh, geometric_field,
     # Create morphic mesh
     mesh = morphic.Mesh()
 
-    mesh_elements.NodesGet()
-
-    # Load exfiles
-
     # Add nodes
-    if interpolation == 'linear':
+    if interpolation in ['linear', 'quadratic', 'cubic']:
         derivatives = [1]
     elif interpolation == 'hermite':
         derivatives = range(1,9)
-    for node_num in exnode.nodeids:
+    for node_num in node_nums:
         coordinates = []
-        for component in range(1, 4):
-            component_name = ["x", "y", "z"][component - 1]
+        for c_idx, c in enumerate([1, 2, 3]): # Component
             componentValues = []
             for derivative_idx, derivative in enumerate(derivatives):
                 componentValues.append(
                     geometric_field.ParameterSetGetNodeDP(
                             iron.FieldVariableTypes.U,
                             iron.FieldParameterSetTypes.VALUES, 1, derivative,
-                            node_num, component))
+                            int(node_num), c))
             coordinates.append(componentValues)
 
         mesh.add_stdnode(node_num, coordinates, group='_default')
@@ -274,19 +270,28 @@ def OpenCMISS_to_morphic(c_mesh, geometric_field,
     if dimension == 2:
         if interpolation == 'linear':
             element_interpolation = ['L1', 'L1']
+            num_elem_nodes = 4
         if interpolation == 'quadratic':
             element_interpolation = ['L2', 'L2']
+            num_elem_nodes = 16
     elif dimension == 3:
         if interpolation == 'linear':
             element_interpolation = ['L1', 'L1', 'L1']
+            num_elem_nodes = 8
         if interpolation == 'quadratic':
             element_interpolation = ['L2', 'L2', 'L2']
+            num_elem_nodes = 27
+        if interpolation == 'cubic':
+            element_interpolation = ['L3', 'L3', 'L3']
+            num_elem_nodes = 64
         if interpolation == 'hermite':
             element_interpolation = ['H3', 'H3', 'H3']
+            num_elem_nodes = 8
 
     # Add elements
-    for elem in exelem.elements:
-        mesh.add_element(elem.number, element_interpolation, elem.nodes)
+    for elem in element_nums:
+        elem_nodes = mesh_elements.NodesGet(int(elem), num_elem_nodes)
+        mesh.add_element(elem, element_interpolation, elem_nodes)
         #print('Morphic element added', elem.number)
 
     # Generate the mesh
