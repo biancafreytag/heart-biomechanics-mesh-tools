@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from opencmiss.iron import iron
-
+import mesh_tools
 
 class Fitting:
     """
@@ -78,7 +78,7 @@ class Fitting:
     def set_data_positions(
             self, element_xi=None, element_nums=None,
             data_point_positions=None, dataset_num=1, data_point_ids=None,
-            debug=False):
+            debug=False, projection_type='all_elements', face=None):
         """
         Sets positions of data as mesh xi or data positions
         """
@@ -107,17 +107,27 @@ class Fitting:
         self.data_projection.CreateStart(
             dataset_num, self.data_points, self.geometric_field,
             iron.FieldVariableTypes.U)
-        self.data_projection.ProjectionTypeSet(
+        if projection_type == 'all_elements':
+            self.data_projection.ProjectionTypeSet(
             iron.DataProjectionProjectionTypes.ALL_ELEMENTS)
+        elif projection_type == 'faces':
+            self.data_projection.ProjectionTypeSet(
+            iron.DataProjectionProjectionTypes.BOUNDARY_FACES)
         self.data_projection.NumberOfClosestElementsSet(1)
         self.data_projection.AbsoluteToleranceSet(1.0e-14)
         self.data_projection.RelativeToleranceSet(1.0e-14)
         self.data_projection.MaximumNumberOfIterationsSet(int(1e6))
-        self.data_projection.StartingXiSet(np.array(self.data_element_xi))
-        for idx, point_id in enumerate(self.data_point_ids):
-            self.data_projection.ProjectionDataCandidateElementsSet(
-                [int(self.data_point_ids[idx])],
-                [int(element_nums[idx])])
+        if projection_type == 'all_elements':
+            self.data_projection.StartingXiSet(np.array(self.data_element_xi))
+            for idx, point_id in enumerate(self.data_point_ids):
+                self.data_projection.ProjectionDataCandidateElementsSet(
+                    [int(self.data_point_ids[idx])],
+                    [int(element_nums[idx])])
+        elif projection_type == 'faces':
+            self.data_projection.ProjectionDataCandidateFacesSet(
+                data_point_ids.astype(np.int32), element_nums.astype(np.int32),
+                np.array([face] * len(element_nums)).astype(np.int32))
+
         self.data_projection.CreateFinish()
 
         if element_xi is not None:
@@ -147,14 +157,40 @@ class Fitting:
                 self.data_projection.ResultAnalysisOutput(
                     os.path.join(self.results_folder, 'projection_results'))
 
-        # Create mesh topology for data projection
-        self.mesh.TopologyDataPointsCalculateProjection(self.data_projection)
-        # Create decomposition data projection
-        self.decomposition.TopologyDataProjectionCalculate()
+        if projection_type == 'all_elements':
+            # Create mesh topology for data projection
+            self.mesh.TopologyDataPointsCalculateProjection(self.data_projection)
+            # Create decomposition data projection
+            self.decomposition.TopologyDataProjectionCalculate()
+
+        # Save projection results
+        self.projection_vector = np.zeros((self.num_data_points, 3))
+        self.projection_distance = np.zeros(self.num_data_points)
+        for dataPointIdx, dataPoint in enumerate(self.data_point_ids):
+            self.projection_vector[dataPointIdx, :] = \
+                -self.data_projection.ResultProjectionVectorGet(
+                    int(dataPoint), 3)
+            self.projection_distance[dataPointIdx] = \
+                self.data_projection.ResultDistanceGet(int(dataPoint))
+
+    def get_projection_vectors(self,):
+        return self.projection_vector
+
+    def get_projection_distances(self,):
+        return self.projection_distance
+
+    def export_projections(self, export_label):
+        """ Exports the data projections
+        """
+        mesh_tools.exportDatapointsErrorExdata(
+            self.data_point_positions, self.projection_vector, export_label,
+            os.path.join(self.results_folder, export_label))
+
+    def finalise_data_points(self):
+        self.data_points.Finalise()
 
     def set_data_values(self, values=None, labels=None):
-        """
-        Sets positions of data as mesh xi or data positions
+        """ Sets positions of data as mesh xi or data positions
         """
         self.data_values = np.array(values)
         self.data_labels = labels
