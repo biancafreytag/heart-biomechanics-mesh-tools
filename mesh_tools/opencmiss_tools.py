@@ -209,6 +209,16 @@ def num_element_get(mesh, mesh_component=1):
     element_nums = (np.arange(num_elements)+1).tolist()
     return num_elements, element_nums
 
+def export_ex_mesh(filename, region):
+    """
+    Export fields in ex format.
+    """
+
+    fields = iron.Fields()
+    fields.CreateRegion(region)
+    fields.NodesExport(filename, "FORTRAN")
+    fields.ElementsExport(filename, "FORTRAN")
+    fields.Finalise()
 
 def generate_opencmiss_geometry(
         interpolation=None, region_label='region', num_elements=None,
