@@ -1,5 +1,7 @@
+import os
 import numpy as np
 import mesh_tools
+from morphic.utils import export_json
 
 def generate_points_morphic_face(
         mesh, face, value, num_points=[4, 4], element_ids=[], dim=3):
@@ -241,3 +243,38 @@ def surface_mesh(vol, face_node_idxs=None, label='', translations=None):
     surf.label = label
 
     return surf
+
+def export_morphic_nodes_csv(dir, filename, meshes):
+    for mesh_idx, mesh in enumerate(meshes):
+        path = os.path.join(dir, filename + '_{0}.csv'.format(mesh_idx))
+        np.savetxt(path, mesh.get_nodes(), delimiter=',')
+
+def export_morphic_animation(dir, filename, meshes, element_ids='all',
+                             precision='%0.6f'):
+    fp = open(os.path.join(dir, filename), 'w')
+
+    fp.write('{\n')
+    fp.write(' "nodes": {\n')
+    for mesh_idx, mesh in enumerate(meshes):
+        node_ids, nodes_strs, elements_strs = mesh.export_json_strs(
+            element_ids,
+            precision)
+
+        fp.write('    "' + str(mesh_idx) + '": {\n')
+        fp.write('        "nodes": {\n')
+        fp.write(',\n'.join(nodes_strs))
+        fp.write('         \n\t}\n')
+        if mesh_idx == len(meshes) - 1:
+            seperator = ''
+        else:
+            seperator = ','
+        fp.write('\n\t}' + seperator + '\n')
+    fp.write('},\n')
+    fp.write('"elements": {\n')
+    fp.write(',\n'.join(elements_strs))
+    fp.write('\n\t},\n')
+    fp.write(' "nodesIds": \n')
+    fp.write('{0}\n'.format(
+        export_json(node_ids)))
+    fp.write('}')
+    fp.close()
