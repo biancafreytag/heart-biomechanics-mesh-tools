@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import mesh_tools
-from morphic.utils import export_json
+# from morphic.utils import export_json
 
 def generate_points_morphic_face(
         mesh, face, value, num_points=[4, 4], element_ids=[], dim=3):
