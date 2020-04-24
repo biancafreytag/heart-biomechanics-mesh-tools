@@ -3,12 +3,15 @@ import numpy as np
 import json
 
 def export_h5_dataset(export_fname, label, data):
+    if isinstance(data, str):
+        data = np.string_(data)
 
     data_file = h5py.File(export_fname, 'a')
-    if isinstance(data, str):
-        data_file.create_dataset(label, data=np.string_(data))
-    else:
-        data_file.create_dataset(label, data=data)
+    try:
+        del data_file[label]
+    except KeyError:
+        pass
+    data_file.create_dataset(label, data=data)
     data_file.close()
 
 def import_h5_dataset(import_fname, label):
