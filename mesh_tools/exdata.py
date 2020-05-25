@@ -1,3 +1,4 @@
+import os
 import numpy as np
 
 def export_datapoints_ipdata(data, label, filename):
@@ -16,6 +17,10 @@ def export_datapoints_ipdata(data, label, filename):
 
 def export_datapoints_exdata(data, label, filename):
     # Shape of data should be a [num_datapoints,dim] numpy array.
+
+    output_folder = os.path.dirname(filename)
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
 
     field_id = open(filename + '.exdata', 'w')
     field_id.write(' Group name: {0}\n'.format(label))
