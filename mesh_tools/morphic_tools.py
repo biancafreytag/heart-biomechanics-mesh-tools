@@ -2,6 +2,19 @@ import os
 import numpy as np
 import mesh_tools
 from morphic.utils import export_json
+import morphic
+
+
+def load_morphic_mesh(path, label):
+    """Loads a morphic mesh and sets the specified label.
+    """
+    if os.path.exists(path):
+        mesh = morphic.Mesh(path)
+        mesh.label = label
+    else:
+        message = 'Morphic mesh not found'
+        print(message)
+    return mesh
 
 def generate_points_morphic_face(
         mesh, face, value, num_points=[4, 4], element_ids=[], dim=3):
