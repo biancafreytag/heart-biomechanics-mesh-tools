@@ -78,7 +78,8 @@ class Fitting:
     def set_data_positions(
             self, element_xi=None, element_nums=None,
             data_point_positions=None, dataset_num=1, data_point_ids=None,
-            debug=False, projection_type='all_elements', face=None):
+            debug=False, projection_type='all_elements', face=None,
+            skip_projection=False):
         """
         Sets positions of data as mesh xi or data positions
         """
@@ -150,8 +151,9 @@ class Fitting:
                     int(point_id), int(element_nums[idx]))
         else:
             # Perform projection
-            self.data_projection.DataPointsProjectionEvaluate(
-                iron.FieldParameterSetTypes.VALUES)
+            if not skip_projection:
+                self.data_projection.DataPointsProjectionEvaluate(
+                    iron.FieldParameterSetTypes.VALUES)
 
             if debug:
                 self.data_projection.ResultAnalysisOutput(
@@ -166,12 +168,13 @@ class Fitting:
         # Save projection results
         self.projection_vector = np.zeros((self.num_data_points, 3))
         self.projection_distance = np.zeros(self.num_data_points)
-        for dataPointIdx, dataPoint in enumerate(self.data_point_ids):
-            self.projection_vector[dataPointIdx, :] = \
-                -self.data_projection.ResultProjectionVectorGet(
-                    int(dataPoint), 3)
-            self.projection_distance[dataPointIdx] = \
-                self.data_projection.ResultDistanceGet(int(dataPoint))
+        if not skip_projection:
+            for dataPointIdx, dataPoint in enumerate(self.data_point_ids):
+                self.projection_vector[dataPointIdx, :] = \
+                    -self.data_projection.ResultProjectionVectorGet(
+                        int(dataPoint), 3)
+                self.projection_distance[dataPointIdx] = \
+                    self.data_projection.ResultDistanceGet(int(dataPoint))
 
     def get_projection_vectors(self,):
         return self.projection_vector
