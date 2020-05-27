@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import mesh_tools
-from morphic.utils import export_json
+# from morphic.utils import export_json
 import morphic
 
 
