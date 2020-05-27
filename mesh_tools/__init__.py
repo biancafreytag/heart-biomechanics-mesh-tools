@@ -4,6 +4,7 @@ from mesh_tools.fields import *
 from mesh_tools.data import *
 from mesh_tools.mesh_conversions import *
 from mesh_tools.morphic_tools import *
+from mesh_tools.mesh_generation import *
 try:
     from mesh_tools.zinc_tools import *
 except:
